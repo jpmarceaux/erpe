@@ -39,13 +39,36 @@ def plot_outcome_dist(dist, num_qubits, ax=None, color='blue'):
     ax.set_xlabel('Outcome')
     ax.set_ylabel('Counts')
 
+def plot_signal_on_circle(signal, depths, ax=None, title=None):
+    if ax is None:
+        fig, ax = plt.subplots(1, figsize=(12, 6))
+    # plot the signals on the complex plane with a colormap for the depth
+    for idx, d in enumerate(depths):
+        ax.scatter(signal[idx].real, signal[idx].imag, color=plt.cm.viridis(idx/(len(depths)-1)))
+    ax.set_title(title)
+    ax.set_xlabel('Re')
+    ax.set_ylabel('Im')
+    ax.set_aspect('equal')
+    ax.grid()
+    # add colorbar 
+    sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis, norm=plt.Normalize(vmin=0, vmax=len(depths)))
+    sm.set_array([])
+    plt.colorbar(sm, ax=ax, label='Depth index')
+    # draw the unit circle
+    circle = plt.Circle((0, 0), 1, fill=False, color='black')
+    ax.add_artist(circle)
+    # set the axis limits
+    ax.set_xlim(-1.1, 1.1)
+    ax.set_ylim(-1.1, 1.1)
+
+
 class AnalysisBase(ABC):
     def __init__(self, dataset, edesign):
         self.dataset = dataset
         self.edesign = edesign
         self.rpe_outcome_dict = self._construct_rpe_outcome_dict()
         self.raw_estimates, self.last_good_idxs = self._make_raw_estimates()
-        #self.signals = self.extract_signals(dataset)
+        self.signals = self.extract_signals(dataset)
 
     def __str__(self) -> str:
         return f"Estimates: {self.phase_estimates},\n Last Good Index: {self.last_good_idx}"
@@ -118,7 +141,7 @@ class AnalysisBase(ABC):
         ds = self.dataset
         for germ in self.edesign.preparation_fiducials.keys():
             for meas in self.edesign.preparation_fiducials[germ].keys():
-                fig, ax = plt.subplots(2, len(self.edesign.depths), figsize=(10, 5), sharey=True)
+                fig, ax = plt.subplots(2, len(self.edesign.depths), figsize=(len(self.edesign.depths)*3, 10), sharey=True)
                 # set the germ as the super title
                 fig.suptitle(str(germ) + ' ' + str(meas))
                 for idx, depth in enumerate(self.edesign.depths):
@@ -130,6 +153,9 @@ class AnalysisBase(ABC):
 
                     plot_outcome_dist(inphase_data, num_qubits=len(self.edesign.qids), ax=ax[0, idx])
                     plot_outcome_dist(quad_data, num_qubits=len(self.edesign.qids), ax=ax[1, idx])
+                    # add title that is the depth
+                    ax[0, idx].set_title(f'I at {depth}')
+                    ax[1, idx].set_title(f'Q at {depth}')
 
                     if target_model is not None:
                         inphase_target_probs = target_model.probabilities(inphase_circ)
@@ -158,52 +184,51 @@ class AnalysisBase(ABC):
 
     def extract_signals(self, dataset):
         signals = {}
-        for param_label in self.rpe_outcome_dict.keys():
-            signals[param_label] = []
-            inphase_counts = self.rpe_outcome_dict[param_label]['I']
-            quadrature_counts = self.rpe_outcome_dict[param_label]['Q']
-            for idx, d in enumerate(self.edesign.depths):
-                inphase_plus = inphase_counts['+'][idx]
-                inphase_minus = inphase_counts['-'][idx]
-                quadrature_plus = quadrature_counts['+'][idx]
-                quadrature_minus = quadrature_counts['-'][idx]
-                try:
-                    s_real = 1 - 2 * inphase_plus/(inphase_plus + inphase_minus)
-                    s_imag = 1 - 2 * quadrature_plus/(quadrature_plus + quadrature_minus)
-                except:
-                    s_real = 0
-                    s_imag = 0
-                signals[param_label].append(s_real + 1j*s_imag)
+        for germ in self.rpe_outcome_dict.keys():
+            signals[germ] = {}
+            for measurement in self.rpe_outcome_dict[germ].keys():
+                signals[germ][measurement] = []
+                inphase_counts = self.rpe_outcome_dict[germ][measurement]['I']
+                quadrature_counts = self.rpe_outcome_dict[germ][measurement]['Q']
+                for idx, d in enumerate(self.edesign.depths):
+                    inphase_plus = inphase_counts['+'][idx]
+                    inphase_minus = inphase_counts['-'][idx]
+                    quadrature_plus = quadrature_counts['+'][idx]
+                    quadrature_minus = quadrature_counts['-'][idx]
+                    try:
+                        s_real = 1 - 2 * inphase_plus/(inphase_plus + inphase_minus)
+                        s_imag = 1 - 2 * quadrature_plus/(quadrature_plus + quadrature_minus)
+                    except:
+                        s_real = 0
+                        s_imag = 0
+                    signals[germ][measurement].append(s_real + 1j*s_imag)
         return signals
+        # for param_label in self.rpe_outcome_dict.keys():
+        #     signals[param_label] = []
+        #     inphase_counts = self.rpe_outcome_dict[param_label]['I']
+        #     quadrature_counts = self.rpe_outcome_dict[param_label]['Q']
+        #     for idx, d in enumerate(self.edesign.depths):
+        #         inphase_plus = inphase_counts['+'][idx]
+        #         inphase_minus = inphase_counts['-'][idx]
+        #         quadrature_plus = quadrature_counts['+'][idx]
+        #         quadrature_minus = quadrature_counts['-'][idx]
+        #         try:
+        #             s_real = 1 - 2 * inphase_plus/(inphase_plus + inphase_minus)
+        #             s_imag = 1 - 2 * quadrature_plus/(quadrature_plus + quadrature_minus)
+        #         except:
+        #             s_real = 0
+        #             s_imag = 0
+        #         signals[param_label].append(s_real + 1j*s_imag)
+        # return signals
     
-    def plot_signal_on_circle(self, signal, ax=None, title=None):
-        if ax is None:
-            fig, ax = plt.subplots(1, figsize=(12, 6))
-        # plot the signals on the complex plane with a colormap for the depth
-        depths = self.edesign.depths
-        for idx, d in enumerate(depths):
-            ax.scatter(signal[idx].real, signal[idx].imag, color=plt.cm.viridis(idx/(len(depths)-1)))
-        ax.set_title(title)
-        ax.set_xlabel('Re')
-        ax.set_ylabel('Im')
-        ax.set_aspect('equal')
-        ax.grid()
-        # add colorbar 
-        sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis, norm=plt.Normalize(vmin=0, vmax=len(depths)))
-        sm.set_array([])
-        plt.colorbar(sm, ax=ax, label='Depth index')
-        # draw the unit circle
-        circle = plt.Circle((0, 0), 1, fill=False, color='black')
-        ax.add_artist(circle)
-        # set the axis limits
-        ax.set_xlim(-1.1, 1.1)
-        ax.set_ylim(-1.1, 1.1)
-
+    
     def plot_all_signals(self):
-        for param_label in self.signals.keys():
-            fig, ax = plt.subplots(1, figsize=(12, 6))
-            self.plot_signal_on_circle(self.signals[param_label], ax=ax, title=param_label)
-            plt.show()
+        for germ in self.signals.keys():
+            for measurment in self.signals[germ].keys():
+                fig, ax = plt.subplots(1, figsize=(12, 6))
+                plot_signal_on_circle(self.signals[germ][measurment], self.edesign.depths, ax=ax, title=str(germ) + ' ' + measurment)
+                plt.show()
+
     
         
 class Analysis_XI(AnalysisBase):
