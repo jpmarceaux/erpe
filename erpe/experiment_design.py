@@ -1,5 +1,5 @@
 # typing import
-from typing import List, Tuple, Dict, Iterable
+from typing import List, Dict, Iterable
 from pygsti.circuits import Circuit
 import pygsti
 import matplotlib.pyplot as plt
@@ -21,12 +21,6 @@ class ExperimentDesignBase(ABC):
             meas_fiducial (List[str]): list of measurement fiducials.
             depths (List[int]): list of depths.
         """
-
-        self.germs = self.list_germs()
-        self.inphase_state_preps = self.inphase_prep_fid_dict()
-        self.quadruature_state_preps = self.quadrature_prep_fid_dict()
-        self.meas_fiducials = self.measurment_fid_dict()
-        self.signal_subspaces = self.signal_subspace_dict()
         self.depths = depths
         self.line_labels = line_labels
 
@@ -51,24 +45,24 @@ class ExperimentDesignBase(ABC):
     # def germ_hash(self, idx):
     #     return self.germ_to_hash(self.germs[idx])
 
-    @abstractmethod
-    def list_germs(self):
+    @property
+    #@abstractmethod
+    def germs(self):
         pass
     
-    @abstractmethod
-    def inphase_prep_fid_dict(self): 
-        pass
-    
-    @abstractmethod
-    def quadrature_prep_fid_dict(self):
-        pass
-    
-    @abstractmethod
-    def measurment_fid_dict(self):
+    @property
+    #@abstractmethod
+    def preparation_fiducials(self): 
         pass
 
-    @abstractmethod
-    def signal_subspace_dict(self):
+    @property
+    #@abstractmethod
+    def measurement_fiducials(self):
+        pass
+
+    @property
+    #@abstractmethod
+    def signal_subspaces(self):
         pass
     
     # @property
@@ -79,193 +73,6 @@ class ExperimentDesignBase(ABC):
     #         int: number of circuits.
     #     """
     #     return 2 * len(self.germs) * len(self.depths)
-    
-    @property
-    def circuit_list(self) -> List[Circuit]:
-        """List of circuits in the experiment design.
-
-        Returns:
-            List[Circuit]: list of circuits.
-        """
-        all_circs = []
-        for germ in self.germs:
-            germ_str = tuple(germ)
-            for depth in self.depths:
-                all_circs.append(self.circuit_dict[germ_str]['I'][depth])
-                all_circs.append(self.circuit_dict[germ_str]['Q'][depth])
-        return pygsti.remove_duplicates(all_circs)
-
-
-    def _construct_edesign(self):
-        """Construct the experiment design.
-        
-        The experiment design is a three-level dictionary with 
-        keys1 that label the germ
-        keys2 that label in-phase or quadrature
-        keys3 that label the depth
-        The values are pygsti gate sequences. 
-
-        Returns:
-            Dict: experiment design.
-        """
-
-        edesign = {}
-        for idx, germ in enumerate(self.germs):
-            edesign[tuple(germ)] = {'I': {}, 'Q': {}}
-            for depth in self.depths:
-                edesign[tuple(germ)]['I'][depth] = Circuit(self.inphase_state_preps[tuple(germ)] + germ*depth + self.meas_fiducials[tuple(germ)], line_labels=self.line_labels)
-                edesign[tuple(germ)]['Q'][depth] = Circuit(self.quadruature_state_preps[tuple(germ)] + germ*depth + self.meas_fiducials[tuple(germ)], line_labels=self.line_labels)
-        return edesign
-    
-    def make_dataset(self, model, num_shots_per_circuit):
-        """
-        Make a dataset from the experiment design.
-        """
-        ds = pygsti.data.simulate_data(model, self.circuit_list, num_samples=num_shots_per_circuit)
-        return ds
-        
-class EDesign_1QXI(ExperimentDesignBase):
-    def __init__(self, 
-                 depths : List[int],
-                 qid : str='Q0'):
-        depths = depths
-        line_labels = [qid]
-        self.qid = qid
-        super().__init__(depths, line_labels)
-        
-
-    def list_germs(self):
-        gxpi2 = [('Gxpi2', self.qid)]
-        gzpi2 = [('Gzpi2', self.qid)]
-        gi = [('Gi', self.qid)]
-
-        germ1 = gxpi2
-        germ2 = gzpi2 + gxpi2*2 + gzpi2*2 + gxpi2*2 + gzpi2
-        germ3 = gi
-        return [germ1, germ2, germ3]
-    
-    def inphase_prep_fid_dict(self): 
-        gxpi2 = [('Gxpi2', self.qid)]
-        gzpi2 = [('Gzpi2', self.qid)]
-        gypi2 = gzpi2 + gxpi2 + gzpi2*3
-        return {
-            tuple(self.germs[0]) : [], 
-            tuple(self.germs[1]) : [], 
-            tuple(self.germs[2]) : gypi2
-        }
-    
-    def quadrature_prep_fid_dict(self):
-        gxpi2 = [('Gxpi2', self.qid)]
-        return {
-            tuple(self.germs[0]) : gxpi2, 
-            tuple(self.germs[1]) : gxpi2, 
-            tuple(self.germs[2]) : gxpi2
-        }
-    
-    def measurment_fid_dict(self):
-        gxpi2 = [('Gxpi2', self.qid)]
-        gzpi2 = [('Gzpi2', self.qid)]
-        gypi2 = gzpi2 + gxpi2 + gzpi2*3
-        return {
-            tuple(self.germs[0]) : [], 
-            tuple(self.germs[1]) : [], 
-            tuple(self.germs[2]) : gypi2*3
-        }
-    
-    def signal_subspace_dict(self):
-        return {
-            tuple(self.germs[0]) : {
-                'I' : {'+' : ['0', ], '-' : ['1', ]},
-                'Q' : {'+' : ['0', ], '-' : ['1', ]}
-            },
-            tuple(self.germs[1]) : {
-                'I' : {'+' : ['0', ], '-' : ['1', ]},
-                'Q' : {'+' : ['0', ], '-' : ['1', ]}
-            },
-            tuple(self.germs[2]) : {
-                'I' : {'+' : ['0', ], '-' : ['1', ]},
-                'Q' : {'+' : ['0', ], '-' : ['1', ]}
-            }
-        }
-    
-
-class EDesign_CZ():
-    """
-    TODO: adapt the base class to accomodate the CZ experiment design.
-    """
-    def __init__(self, 
-                 depths : List[int],
-                 qids : Tuple[str]):
-        self.depths = depths
-        self.qids = qids
-        self.circuit_dict = self._construct_edesign()
-
-    @property
-    def germs(self):
-        gcz = [('Gcz', *self.qids), ]
-        germ1 = gcz
-        return [germ1]
-    
-    @property
-    def preparation_fiducials(self): 
-        return {
-            tuple(('Gcz', *self.qids),): {
-                '0+' : {
-                    'I': [('Gypi2', self.qids[1])],
-                    'Q': [('Gxpi2', self.qids[1])],
-                }, 
-                '1+' : {
-                    'I': [('Gypi2', self.qids[1]), ('Gxpi2', self.qids[0]), ('Gxpi2', self.qids[0]), ],
-                    'Q': [('Gxpi2', self.qids[1]), ('Gxpi2', self.qids[0]), ('Gxpi2', self.qids[0]), ],
-                },
-                '+1' : {
-                    'I': [('Gypi2', self.qids[0]), ('Gxpi2', self.qids[1]), ('Gxpi2', self.qids[1]), ],
-                    'Q': [('Gxpi2', self.qids[0]), ('Gxpi2', self.qids[1]), ('Gxpi2', self.qids[1]), ],
-                }
-            }
-        }
-    
-    @property
-    def measurement_fiducials(self):
-        return {
-            (('Gcz', *self.qids)): {
-                '0+' : [('Gypi2', self.qids[1])]*3,
-                '1+' : [('Gypi2', self.qids[1])]*3,
-                '+1' : [('Gypi2', self.qids[0])]*3,
-            }
-        }
-    
-    @property
-    def signal_subspaces(self):
-        return {
-            (('Gcz', *self.qids)): {
-                '0+' : {
-                    'I': {'+' : ['00', ], '-' : ['01', ]},
-                    'Q' : {'+' : ['00', ], '-' : ['01', ]}
-                },
-                '1+' : {
-                    'I': {'+' : ['10', ], '-' : ['11', ]},
-                    'Q' : {'+' : ['10', ], '-' : ['11', ]}
-                },
-                '+1' : {
-                    'I': {'+' : ['01', ], '-' : ['11', ]},
-                    'Q' : {'+' : ['01', ], '-' : ['11', ]}
-                }
-
-            }
-            # tuple(self.germs[0]) : {
-            #     'I' : {'+' : ['0', ], '-' : ['1', ]},
-            #     'Q' : {'+' : ['0', ], '-' : ['1', ]}
-            # },
-            # tuple(self.germs[1]) : {
-            #     'I' : {'+' : ['0', ], '-' : ['1', ]},
-            #     'Q' : {'+' : ['0', ], '-' : ['1', ]}
-            # },
-            # tuple(self.germs[2]) : {
-            #     'I' : {'+' : ['0', ], '-' : ['1', ]},
-            #     'Q' : {'+' : ['0', ], '-' : ['1', ]}
-            # }
-        }
     
     @property
     def circuit_list(self) -> List[Circuit]:
@@ -296,13 +103,13 @@ class EDesign_CZ():
                 for depth in self.depths:
                     edesign[germ][measurement]['I'][depth] = Circuit(
                         self.preparation_fiducials[germ][measurement]['I'] 
-                        + [germ]*depth 
+                        + germ*depth 
                         + self.measurement_fiducials[germ][measurement], 
                         line_labels=list(self.qids)
                     )
                     edesign[germ][measurement]['Q'][depth] = Circuit(
                         self.preparation_fiducials[germ][measurement]['Q'] 
-                        + [germ]*depth 
+                        + germ*depth 
                         + self.measurement_fiducials[germ][measurement], 
                         line_labels=list(self.qids)
                     )
@@ -314,6 +121,294 @@ class EDesign_CZ():
         """
         ds = pygsti.data.simulate_data(model, self.circuit_list, num_samples=num_shots_per_circuit)
         return ds
+        
+class EDesign_1QXI(ExperimentDesignBase):
+    def __init__(self, 
+                 depths : List[int],
+                 qids : str='Q0'):
+        depths = depths
+        line_labels = qids
+        assert len(qids) == 1, "Only one qubit is allowed for this experiment design."
+        self.qids = qids
+        super().__init__(depths, line_labels)
+
+    @property
+    def germs(self):
+        gxpi2 = Circuit([('Gxpi2', self.qids[0])], line_labels=self.qids)
+        gzpi2 = Circuit([('Gzpi2', self.qids[0])], line_labels=self.qids)   
+        gi = Circuit([('Gi', self.qids[0])], line_labels=self.qids)
+
+        germ1 = gxpi2
+        germ2 = gzpi2 + gxpi2*2 + gzpi2*2 + gxpi2*2 + gzpi2
+        germ3 = gi
+        return [germ1, germ2, germ3]
+    
+    # def inphase_prep_fid_dict(self): 
+    #     gxpi2 = [('Gxpi2', self.qid)]
+    #     gzpi2 = [('Gzpi2', self.qid)]
+    #     gypi2 = gzpi2 + gxpi2 + gzpi2*3
+    #     return {
+    #         Circuit(self.germs[0]) : [], 
+    #         Circuit(self.germs[1]) : [], 
+    #         Circuit(self.germs[2]) : gypi2
+    #     }
+    
+    # def quadrature_prep_fid_dict(self):
+    #     gxpi2 = [('Gxpi2', self.qid)]
+    #     return {
+    #         Circuit(self.germs[0]) : gxpi2, 
+    #         Circuit(self.germs[1]) : gxpi2, 
+    #         Circuit(self.germs[2]) : gxpi2
+    #     }
+
+    @property
+    def preparation_fiducials(self): 
+        """
+        Define the preparation fiducials for the experiment design.
+
+        Since this is a single-qubit edesign, each germ has a single measurement type.        
+        """
+        gxpi2 = [('Gxpi2', self.qids[0])]
+        gzpi2 = [('Gzpi2', self.qids[0])]
+        gypi2 = gzpi2 + gxpi2 + gzpi2*3
+        return {
+            Circuit(self.germs[0]): {
+                '0' : {
+                    'I': Circuit([], line_labels=self.qids),
+                    'Q': Circuit([('Gxpi2', self.qids[0])], line_labels=self.qids),
+                },
+            }, 
+            Circuit(self.germs[1]): {
+                '0' : {
+                    'I': Circuit([], line_labels=self.qids),
+                    'Q': Circuit([('Gxpi2', self.qids[0])], line_labels=self.qids),
+                },
+            },
+            Circuit(self.germs[2]): {
+                '+' : {
+                    'I': Circuit(gypi2,  line_labels=self.qids),
+                    'Q': Circuit([('Gxpi2', self.qids[0])],  line_labels=self.qids),
+                },
+            }
+        }
+    
+    @property
+    def measurement_fiducials(self):
+        gxpi2 = [('Gxpi2', self.qids[0])]
+        gzpi2 = [('Gzpi2', self.qids[0])]
+        gypi2 = gzpi2 + gxpi2 + gzpi2*3
+        return {
+            Circuit(self.germs[0]): {
+                '0' : Circuit([], line_labels=self.qids),
+            }, 
+            Circuit(self.germs[1]): {
+                '0' : Circuit([], line_labels=self.qids),
+            }, 
+            Circuit(self.germs[2]): {
+                '+' : Circuit(gypi2*3, line_labels=self.qids),
+            }, 
+        }
+    
+    # def measurment_fid_dict(self):
+    #     gxpi2 = [('Gxpi2', self.qid)]
+    #     gzpi2 = [('Gzpi2', self.qid)]
+    #     gypi2 = gzpi2 + gxpi2 + gzpi2*3
+    #     return {
+    #         Circuit(self.germs[0]) : [], 
+    #         Circuit(self.germs[1]) : [], 
+    #         Circuit(self.germs[2]) : gypi2*3
+    #     }
+    
+    # def signal_subspace_dict(self):
+        # return {
+        #     Circuit(self.germs[0]) : {
+        #         'I' : {'+' : ['0', ], '-' : ['1', ]},
+        #         'Q' : {'+' : ['0', ], '-' : ['1', ]}
+        #     },
+        #     Circuit(self.germs[1]) : {
+        #         'I' : {'+' : ['0', ], '-' : ['1', ]},
+        #         'Q' : {'+' : ['0', ], '-' : ['1', ]}
+        #     },
+        #     Circuit(self.germs[2]) : {
+        #         'I' : {'+' : ['0', ], '-' : ['1', ]},
+        #         'Q' : {'+' : ['0', ], '-' : ['1', ]}
+        #     }
+        # }
+
+    @property
+    def signal_subspaces(self):
+        return {
+            Circuit(self.germs[0]) : {
+                '0' : {
+                    'I' : {'+' : ['0', ], '-' : ['1', ]},
+                    'Q' : {'+' : ['0', ], '-' : ['1', ]}
+                }
+            },
+            Circuit(self.germs[1]) : {
+                '0' : {
+                    'I' : {'+' : ['0', ], '-' : ['1', ]},
+                    'Q' : {'+' : ['0', ], '-' : ['1', ]}
+                }
+            },
+            Circuit(self.germs[2]) : {
+                '+' : {
+                    'I' : {'+' : ['0', ], '-' : ['1', ]},
+                    'Q' : {'+' : ['0', ], '-' : ['1', ]}
+                }
+            }
+        }
+        # return {
+        #     (('Gcz', *self.qids)): {
+        #         '0+' : {
+        #             'I': {'+' : ['00', ], '-' : ['01', ]},
+        #             'Q' : {'+' : ['00', ], '-' : ['01', ]}
+        #         },
+        #         '1+' : {
+        #             'I': {'+' : ['10', ], '-' : ['11', ]},
+        #             'Q' : {'+' : ['10', ], '-' : ['11', ]}
+        #         },
+        #         '+1' : {
+        #             'I': {'+' : ['01', ], '-' : ['11', ]}, line_labels=self.qids),
+        #             'Q' : {'+' : ['01', ], '-' : ['11', ]}
+        #         }
+        #     }
+        # }
+    
+
+class EDesign_CZ(ExperimentDesignBase):
+    """
+    TODO: adapt the base class to accomodate the CZ experiment design.
+    """
+    def __init__(self, 
+                 depths : List[int],
+                 qids):
+        self.depths = depths
+        assert len(qids) == 2, "Only two qubits are allowed for this experiment design."
+        self.qids = qids
+        super().__init__(depths, line_labels=qids)
+
+    @property
+    def germs(self):
+        gcz = [('Gcz', *self.qids), ]
+        germ1 = gcz
+        return [Circuit(germ1, line_labels=self.qids)]
+    
+    @property
+    def preparation_fiducials(self): 
+        return {
+            self.germs[0]: {
+                '0+' : {
+                    'I': Circuit([('Gypi2', self.qids[1])], line_labels=self.qids),
+                    'Q': Circuit([('Gxpi2', self.qids[1])], line_labels=self.qids),
+                }, 
+                '1+' : {
+                    'I': Circuit([('Gypi2', self.qids[1]), 
+                                  ('Gxpi2', self.qids[0]), 
+                                  ('Gxpi2', self.qids[0]), ], line_labels=self.qids),
+                    'Q': Circuit([('Gxpi2', self.qids[1]), 
+                                  ('Gxpi2', self.qids[0]), 
+                                  ('Gxpi2', self.qids[0]), ], line_labels=self.qids),
+                },
+                '+1' : {
+                    'I': Circuit([('Gypi2', self.qids[0]), 
+                                  ('Gxpi2', self.qids[1]), 
+                                  ('Gxpi2', self.qids[1]), ], line_labels=self.qids),
+                    'Q': Circuit([('Gxpi2', self.qids[0]),
+                                  ('Gxpi2', self.qids[1]), 
+                                  ('Gxpi2', self.qids[1]), ], line_labels=self.qids),
+                }
+            }
+        }
+    
+    @property
+    def measurement_fiducials(self):
+        return {
+            self.germs[0]: {
+                '0+' : Circuit([('Gypi2', self.qids[1])]*3, line_labels=self.qids),
+                '1+' : Circuit([('Gypi2', self.qids[1])]*3, line_labels=self.qids),
+                '+1' : Circuit([('Gypi2', self.qids[0])]*3, line_labels=self.qids),
+            }
+        }
+    
+    @property
+    def signal_subspaces(self):
+        return {
+            self.germs[0]: {
+                '0+' : {
+                    'I': {'+' : ['00', ], '-' : ['01', ]},
+                    'Q' : {'+' : ['00', ], '-' : ['01', ]}
+                },
+                '1+' : {
+                    'I': {'+' : ['10', ], '-' : ['11', ]},
+                    'Q' : {'+' : ['10', ], '-' : ['11', ]}
+                },
+                '+1' : {
+                    'I': {'+' : ['01', ], '-' : ['11', ]},
+                    'Q' : {'+' : ['01', ], '-' : ['11', ]}
+                }
+
+            }
+            # Circuit(self.germs[0]) : {
+            #     'I' : {'+' : ['0', ], '-' : ['1', ]},
+            #     'Q' : {'+' : ['0', ], '-' : ['1', ]}
+            # },
+            # Circuit(self.germs[1]) : {
+            #     'I' : {'+' : ['0', ], '-' : ['1', ]},
+            #     'Q' : {'+' : ['0', ], '-' : ['1', ]}
+            # },
+            # Circuit(self.germs[2]) : {
+            #     'I' : {'+' : ['0', ], '-' : ['1', ]},
+            #     'Q' : {'+' : ['0', ], '-' : ['1', ]}
+            # }
+        }
+    
+    # @property
+    # def circuit_list(self) -> List[Circuit]:
+    #     """List of circuits in the experiment design.
+
+    #     Returns:
+    #         List[Circuit]: list of circuits.
+    #     """
+    #     all_circs = []
+    #     for germ in self.circuit_dict.keys():
+    #         for measurement in self.circuit_dict[germ].keys():
+    #             for depth in self.circuit_dict[germ][measurement]['I'].keys():
+    #                 all_circs.append(self.circuit_dict[germ][measurement]['I'][depth])
+    #                 all_circs.append(self.circuit_dict[germ][measurement]['Q'][depth])
+    #     return pygsti.remove_duplicates(all_circs)
+        
+    # def _construct_edesign(self):
+    #     """Construct the experiment design.
+    #     Returns:
+    #         Dict: experiment design.
+    #     """
+
+    #     edesign = {}
+    #     for germ in self.preparation_fiducials.keys():
+    #         edesign[germ] = {}
+    #         for measurement in self.measurement_fiducials[germ].keys():
+    #             edesign[germ][measurement] = {'I' : {}, 'Q' : {}}
+    #             for depth in self.depths:
+    #                 edesign[germ][measurement]['I'][depth] = Circuit(
+    #                     self.preparation_fiducials[germ][measurement]['I'] 
+    #                     + [germ]*depth 
+    #                     + self.measurement_fiducials[germ][measurement], 
+    #                     line_labels=list(self.qids)
+    #                 )
+    #                 edesign[germ][measurement]['Q'][depth] = Circuit(
+    #                     self.preparation_fiducials[germ][measurement]['Q'] 
+    #                     + [germ]*depth 
+    #                     + self.measurement_fiducials[germ][measurement], 
+    #                     line_labels=list(self.qids)
+    #                 )
+    #     return edesign
+    
+    # def make_dataset(self, model, num_shots_per_circuit):
+    #     """
+    #     Make a dataset from the experiment design.
+    #     """
+    #     ds = pygsti.data.simulate_data(model, self.circuit_list, num_samples=num_shots_per_circuit)
+    #     return ds
 
 # class EDesign_1QXZ(ExperimentDesign):
 #     def __init__(self, 
