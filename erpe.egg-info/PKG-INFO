@@ -10,5 +10,8 @@ Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.6
 Description-Content-Type: text/markdown
+Requires-Dist: requests
+Requires-Dist: pygsti
+Requires-Dist: numpy
 
 Robust Phase Estimation in Python

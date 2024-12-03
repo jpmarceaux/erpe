@@ -3,7 +3,9 @@ setup.py
 erpe/__init__.py
 erpe/analysis.py
 erpe/experiment_design.py
+erpe/lqr.py
 erpe/models.py
+erpe/qcal_util.py
 erpe.egg-info/PKG-INFO
 erpe.egg-info/SOURCES.txt
 erpe.egg-info/dependency_links.txt

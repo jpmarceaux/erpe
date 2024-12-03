@@ -240,27 +240,11 @@ class Analysis_XI(AnalysisBase):
         best_raw = self.best_raw
         estimate_axis = -np.sin(best_raw['ZXXZZXXZ']/2)/(2*np.cos(np.pi*best_raw['X']/2))
         return {
-            'X overrot' : -best_raw['X'] - np.pi/2, 
+            'X overrot' :-2*best_raw['X']/np.pi - 1,
             'X axis' : -estimate_axis, 
             'idle' : -best_raw['I']
         }
 
-        pass
-        # raw0 = self.phase_estimates[tuple(self.edesign.germs[0])][self.last_good_idxs[tuple(self.edesign.germs[0])]]
-        # raw1 = self.phase_estimates[tuple(self.edesign.germs[1])][self.last_good_idxs[tuple(self.edesign.germs[1])]]
-        # raw2 = self.phase_estimates[tuple(self.edesign.germs[2])][self.last_good_idxs[tuple(self.edesign.germs[2])]]
-        # raw0_rectified = (raw0 + np.pi) % (2*np.pi) - np.pi
-        # estimate0_unrectified = -raw0_rectified/(np.pi/2) - 1
-        # estimate0 = (estimate0_unrectified + np.pi) % (2*np.pi) - np.pi
-        # raw1_rectified = (raw1 + np.pi) % (2*np.pi) - np.pi
-        # estimate1 = -np.sin(raw1_rectified/2)/(2*np.cos(np.pi*estimate0/2))
-        # estimate2 = -(raw2 + np.pi) % (2*np.pi) - np.pi
-        # return {
-        #     tuple(self.edesign.germs[0]): estimate0,
-        #     tuple(self.edesign.germs[1]): estimate1,
-        #     tuple(self.edesign.germs[2]): estimate2
-        # }
-    
     @property
     def best_raw(self):
         germ0 = self.edesign.germs[0]
@@ -273,6 +257,66 @@ class Analysis_XI(AnalysisBase):
         }
         return {key : (raws[key] + np.pi) % (2*np.pi) - np.pi  for key in raws.keys()}
 
+class Analysis_Ramsey(AnalysisBase):
+    def __init__(self, dataset, edesign):
+        super().__init__(dataset, edesign)
+
+    @property
+    def estimates(self):
+        best_raw = self.best_raw
+        return {
+            'idle' : -best_raw['I']
+        }
+
+    @property
+    def best_raw(self):
+        germ0 = self.edesign.germs[0]
+        raws = {
+            'I' : self.raw_estimates[germ0]['+'][self.last_good_idxs[germ0]['+']],
+        }
+        return {key : (raws[key] + np.pi) % (2*np.pi) - np.pi  for key in raws.keys()}
+
+class Analysis_Xgate(AnalysisBase):
+    def __init__(self, dataset, edesign):
+        super().__init__(dataset, edesign)
+
+    @property
+    def estimates(self):
+        best_raw = self.best_raw
+        estimate_axis = -np.sin(best_raw['ZXXZZXXZ']/2)/(2*np.cos(np.pi*best_raw['X']/2))
+        return {
+            'X overrot' : -2*best_raw['X']/np.pi - 1,
+            'X axis' : -estimate_axis, 
+        }
+
+    @property
+    def best_raw(self):
+        germ0 = self.edesign.germs[0]
+        germ1 = self.edesign.germs[1]
+        raws = {
+            'X' : self.raw_estimates[germ0]['0'][self.last_good_idxs[germ0]['0']],
+            'ZXXZZXXZ' : self.raw_estimates[germ1]['0'][self.last_good_idxs[germ1]['0']],
+        }
+        return {key : (raws[key] + np.pi) % (2*np.pi) - np.pi  for key in raws.keys()}
+    
+class Analysis_Xoverrot(AnalysisBase):
+    def __init__(self, dataset, edesign):
+        super().__init__(dataset, edesign)
+
+    @property
+    def estimates(self):
+        best_raw = self.best_raw
+        return {
+            'X overrot' : -2*best_raw['X']/np.pi - 1,
+        }
+
+    @property
+    def best_raw(self):
+        germ0 = self.edesign.germs[0]
+        raws = {
+            'X' : self.raw_estimates[germ0]['0'][self.last_good_idxs[germ0]['0']],
+        }
+        return {key : (raws[key] + np.pi) % (2*np.pi) - np.pi  for key in raws.keys()}
     
 
 class Analysis_CZ(AnalysisBase):
