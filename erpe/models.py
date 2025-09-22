@@ -5,6 +5,26 @@ from scipy.linalg import expm
 from pygsti import sigmax, sigmay, sigmaz, sigmazz, sigmazi, sigmaiz
 import numpy as np
 
+pauli_basis_2q = [
+    np.kron(np.eye(2), sigmax),
+    np.kron(np.eye(2), sigmay),
+    np.kron(np.eye(2), sigmaz),
+    np.kron(sigmax, np.eye(2)),
+    np.kron(sigmax, sigmax),
+    np.kron(sigmax, sigmay),
+    np.kron(sigmax, sigmaz),
+    np.kron(sigmay, np.eye(2)),
+    np.kron(sigmay, sigmax),
+    np.kron(sigmay, sigmay),
+    np.kron(sigmay, sigmaz),
+    np.kron(sigmaz, np.eye(2)),
+    np.kron(sigmaz, sigmax),
+    np.kron(sigmaz, sigmay),
+    np.kron(sigmaz, sigmaz)
+]
+
+
+
 
 def X90_unitary(x_error, z_error):
     """Definition of an Xpi2 rotation with x and z errors
@@ -74,6 +94,12 @@ def CZ_unitary(x_IZ, x_ZI, x_ZZ):
     H0 = np.pi/2 * (sigmazi + sigmaiz) - np.pi/2 * (sigmazz + np.eye(4))
     Hdelta = x_ZI * sigmazi + x_IZ * sigmaiz + x_ZZ * sigmazz
     return expm(-(1j/2) * (H0 + Hdelta))
+
+def idle_unitary_2q_general(xvec):
+    assert len(xvec) == 15
+    H = sum([xvec[i] * pauli_basis_2q[i] for i in range(15)])
+    return expm(-(1j/2) * H)
+
 
 
 def create_XZ_model_1q(x_vec, 
@@ -184,6 +210,41 @@ def create_CZ_model(x_vec,
                                 nonstd_gate_unitaries={'Gcz': U},
                                 qubit_labels = qids,
                                 availability={'Gcz': [tuple(qids), ]})
+    model = create_explicit_model(pspec)
+    model.sim = 'map'
+    return model
+
+def create_idle_model(x_vec, 
+                    qids: list=['Q0', 'Q1'],
+                    single_qb_depol_rate : float=0., 
+                    two_qb_depol_rate : float=0.):
+    """
+    Create a single-qubit model with X and I errors.
+
+    Parameters
+    ----------
+    x_vec : numpy.ndarray
+        3-element array specifying the error parameters 
+        (x_error, detuning, idle_phase_error
+
+    qid : str, optional
+        The qubit id. Default is 'Q0'.
+
+    gate_depol_rate : float, optional
+        The depolarizing error rate for the gates. Default is 0.
+    Returns
+    -------
+    Model
+    """
+    Uidle = idle_unitary_2q_general(x_vec)
+
+    pspec = QubitProcessorSpec(num_qubits=2, gate_names=['Gxpi2', 'Gypi2', 'Gzpi2', 'Gcphase', 'Gidle'],
+                                nonstd_gate_unitaries={'Gidle': Uidle},
+                                qubit_labels = qids,
+                                availability={
+                                    'Gcphase': [tuple(qids), ],
+                                    'Gidle': [tuple(qids), ]
+                                })
     model = create_explicit_model(pspec)
     model.sim = 'map'
     return model
